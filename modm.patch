@@ -1,0 +1,139 @@
+diff --git a/src/common/tusb_compiler.h b/src/common/tusb_compiler.h
+index 6f6aa3c..e36842b 100644
+--- a/src/common/tusb_compiler.h
++++ b/src/common/tusb_compiler.h
+@@ -44,7 +44,7 @@
+ #endif
+
+ // Compile-time Assert
+-#if __STDC_VERSION__ >= 201112L
++#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+   #define TU_VERIFY_STATIC   _Static_assert
+ #else
+   #define TU_VERIFY_STATIC(const_expr, _mess) enum { TU_XSTRCAT(_verify_static_, _TU_COUNTER_) = 1/(!!(const_expr)) }
+diff --git a/src/common/tusb_verify.h b/src/common/tusb_verify.h
+index 406f5e6..b0b3a3f 100644
+--- a/src/common/tusb_verify.h
++++ b/src/common/tusb_verify.h
+@@ -76,8 +76,8 @@
+
+ #if CFG_TUSB_DEBUG
+   #include <stdio.h>
+-  #define _MESS_ERR(_err)   printf("%s %d: failed, error = %s\r\n", __func__, __LINE__, tusb_strerr[_err])
+-  #define _MESS_FAILED()    printf("%s %d: assert failed\r\n", __func__, __LINE__)
++  #define _MESS_ERR(_err)   tu_printf("%s %d: failed, error = %s\r\n", __func__, __LINE__, tusb_strerr[_err])
++  #define _MESS_FAILED()    tu_printf("%s %d: assert failed\r\n", __func__, __LINE__)
+ #else
+   #define _MESS_ERR(_err) do {} while (0)
+   #define _MESS_FAILED() do {} while (0)
+@@ -120,8 +120,9 @@
+ #define TU_VERIFY_1ARGS(_cond)                         TU_VERIFY_DEFINE(_cond, , false)
+ #define TU_VERIFY_2ARGS(_cond, _ret)                   TU_VERIFY_DEFINE(_cond, , _ret)
+
++#ifndef TU_VERIFY
+ #define TU_VERIFY(...)                   GET_3RD_ARG(__VA_ARGS__, TU_VERIFY_2ARGS, TU_VERIFY_1ARGS, UNUSED)(__VA_ARGS__)
+-
++#endif
+
+ /*------------------------------------------------------------------*/
+ /* TU_VERIFY WITH HANDLER
+@@ -131,7 +132,9 @@
+ #define TU_VERIFY_HDLR_2ARGS(_cond, _handler)           TU_VERIFY_DEFINE(_cond, _handler, false)
+ #define TU_VERIFY_HDLR_3ARGS(_cond, _handler, _ret)     TU_VERIFY_DEFINE(_cond, _handler, _ret)
+
++#ifndef TU_VERIFY_HDLR
+ #define TU_VERIFY_HDLR(...)              GET_4TH_ARG(__VA_ARGS__, TU_VERIFY_HDLR_3ARGS, TU_VERIFY_HDLR_2ARGS,UNUSED)(__VA_ARGS__)
++#endif
+
+ /*------------------------------------------------------------------*/
+ /* ASSERT
+@@ -142,7 +145,9 @@
+ #define ASSERT_1ARGS(_cond)            TU_VERIFY_DEFINE(_cond, _MESS_FAILED(); TU_BREAKPOINT(), false)
+ #define ASSERT_2ARGS(_cond, _ret)      TU_VERIFY_DEFINE(_cond, _MESS_FAILED(); TU_BREAKPOINT(), _ret)
+
++#ifndef TU_ASSERT
+ #define TU_ASSERT(...)             GET_3RD_ARG(__VA_ARGS__, ASSERT_2ARGS, ASSERT_1ARGS,UNUSED)(__VA_ARGS__)
++#endif
+
+ // TODO remove TU_ASSERT_ERR() later
+
+@@ -166,7 +171,9 @@
+ #define ASERT_ERR_1ARGS(_error)         TU_VERIFY_ERR_DEF2(_error, TU_BREAKPOINT())
+ #define ASERT_ERR_2ARGS(_error, _ret)   TU_VERIFY_ERR_DEF3(_error, TU_BREAKPOINT(), _ret)
+
++#ifndef TU_ASSERT_ERR
+ #define TU_ASSERT_ERR(...)         GET_3RD_ARG(__VA_ARGS__, ASERT_ERR_2ARGS, ASERT_ERR_1ARGS,UNUSED)(__VA_ARGS__)
++#endif
+
+ /*------------------------------------------------------------------*/
+ /* ASSERT HDLR
+diff --git a/src/portable/st/stm32_fsdev/dcd_stm32_fsdev.c b/src/portable/st/stm32_fsdev/dcd_stm32_fsdev.c
+index 3217987..115ed3e 100644
+--- a/src/portable/st/stm32_fsdev/dcd_stm32_fsdev.c
++++ b/src/portable/st/stm32_fsdev/dcd_stm32_fsdev.c
+@@ -150,6 +150,12 @@
+ #  define USE_SOF     0
+ #endif
+
++// Some STM32F3 devices allow to remap the USB interrupt vectors from shared
++// USB/CAN IRQs to separate CAN and USB IRQs
++#ifndef STM32F3_IRQ_REMAP
++#  define STM32F3_IRQ_REMAP 0
++#endif
++
+ /***************************************************
+  * Checks, structs, defines, function definitions, etc.
+  */
+@@ -276,9 +282,15 @@ void dcd_int_enable (uint8_t rhport)
+ #if CFG_TUSB_MCU == OPT_MCU_STM32F0 || CFG_TUSB_MCU == OPT_MCU_STM32L0
+   NVIC_EnableIRQ(USB_IRQn);
+ #elif CFG_TUSB_MCU == OPT_MCU_STM32F3
++  #if STM32F3_IRQ_REMAP
++  NVIC_EnableIRQ(USB_HP_IRQn);
++  NVIC_EnableIRQ(USB_LP_IRQn);
++  NVIC_EnableIRQ(USBWakeUp_RMP_IRQn);
++  #else
+   NVIC_EnableIRQ(USB_HP_CAN_TX_IRQn);
+   NVIC_EnableIRQ(USB_LP_CAN_RX0_IRQn);
+   NVIC_EnableIRQ(USBWakeUp_IRQn);
++  #endif
+ #elif CFG_TUSB_MCU == OPT_MCU_STM32F1
+   NVIC_EnableIRQ(USB_HP_CAN1_TX_IRQn);
+   NVIC_EnableIRQ(USB_LP_CAN1_RX0_IRQn);
+@@ -296,9 +308,15 @@ void dcd_int_disable(uint8_t rhport)
+ #if CFG_TUSB_MCU == OPT_MCU_STM32F0 || CFG_TUSB_MCU == OPT_MCU_STM32L0
+   NVIC_DisableIRQ(USB_IRQn);
+ #elif CFG_TUSB_MCU == OPT_MCU_STM32F3
++  #if STM32F3_IRQ_REMAP
++  NVIC_DisableIRQ(USB_HP_IRQn);
++  NVIC_DisableIRQ(USB_LP_IRQn);
++  NVIC_DisableIRQ(USBWakeUp_RMP_IRQn);
++  #else
+   NVIC_DisableIRQ(USB_HP_CAN_TX_IRQn);
+   NVIC_DisableIRQ(USB_LP_CAN_RX0_IRQn);
+   NVIC_DisableIRQ(USBWakeUp_IRQn);
++  #endif
+ #elif CFG_TUSB_MCU == OPT_MCU_STM32F1
+   NVIC_DisableIRQ(USB_HP_CAN1_TX_IRQn);
+   NVIC_DisableIRQ(USB_LP_CAN1_RX0_IRQn);
+diff --git a/src/tusb_option.h b/src/tusb_option.h
+index 7e486bf..f8ade49 100644
+--- a/src/tusb_option.h
++++ b/src/tusb_option.h
+@@ -110,12 +110,12 @@
+
+
+ // Allow to use command line to change the config name/location
+-#ifndef CFG_TUSB_CONFIG_FILE
+-  #define CFG_TUSB_CONFIG_FILE "tusb_config.h"
++#ifdef CFG_TUSB_CONFIG_FILE
++  #include CFG_TUSB_CONFIG_FILE
++#else
++  #include "tusb_config.h"
+ #endif
+
+-#include CFG_TUSB_CONFIG_FILE
+-
+ /** \addtogroup group_configuration
+  *  @{ */
+

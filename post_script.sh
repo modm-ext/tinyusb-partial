@@ -2,11 +2,11 @@
 # YOUR MILEAGE MAY VARY
 
 # convert all files to unix line endings
-find FreeRTOS -path "*/.git" -prune -o -type f -print0 | xargs -0 -I file dos2unix file file
+find src -path "*/.git" -prune -o -type f -print0 | xargs -0 -I file dos2unix file file
 
 # yay, computers
 export LANG=C
 export LC_CTYPE=C
 export LC_ALL=C
-# remove all trailing whitespace from the CMSIS files
-find FreeRTOS -path "*/.git" -prune -o -type f -print0 | xargs -0 sed -i 's/\s*$//'
+# remove all trailing whitespace
+find src -path "*/.git" -prune -o -type f -print0 | xargs -0 sed -i 's/\s*$//'
