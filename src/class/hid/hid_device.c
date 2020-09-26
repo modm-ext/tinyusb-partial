@@ -1,4 +1,4 @@
-/* 
+/*
  * The MIT License (MIT)
  *
  * Copyright (c) 2019 Ha Thach (tinyusb.org)
@@ -197,7 +197,7 @@ uint16_t hidd_open(uint8_t rhport, tusb_desc_interface_t const * desc_itf, uint1
 
   p_hid->boot_mode = false; // default mode is REPORT
   p_hid->itf_num   = desc_itf->bInterfaceNumber;
-  
+
   // Use offsetof to avoid pointer to the odd/misaligned address
   memcpy(&p_hid->report_desc_len, (uint8_t*) p_hid->hid_descriptor + offsetof(tusb_hid_descriptor_hid_t, wReportLength), 2);
 

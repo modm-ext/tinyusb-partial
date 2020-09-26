@@ -295,7 +295,7 @@ uint16_t tu_fifo_write_n (tu_fifo_t* f, const void * data, uint16_t count)
     // Part 2: start to remaining
     _ff_push(f, buf8, count-part1);
   }
-  
+
   tu_fifo_unlock(f);
 
   return count;

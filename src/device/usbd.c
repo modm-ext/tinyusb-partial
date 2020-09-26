@@ -1,4 +1,4 @@
-/* 
+/*
  * The MIT License (MIT)
  *
  * Copyright (c) 2019 Ha Thach (tinyusb.org)
@@ -1216,9 +1216,9 @@ bool usbd_edpt_stalled(uint8_t rhport, uint8_t ep_addr)
 
 /**
  * usbd_edpt_close will disable an endpoint.
- * 
+ *
  * In progress transfers on this EP may be delivered after this call.
- * 
+ *
  */
 void usbd_edpt_close(uint8_t rhport, uint8_t ep_addr)
 {

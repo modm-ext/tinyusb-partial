@@ -1,4 +1,4 @@
-/* 
+/*
  * The MIT License (MIT)
  *
  * Copyright (c) 2019 Ha Thach (tinyusb.org)
@@ -398,7 +398,7 @@ static void ed_list_remove_by_addr(ohci_ed_t * p_head, uint8_t dev_addr)
 
 bool hcd_edpt_open(uint8_t rhport, uint8_t dev_addr, tusb_desc_endpoint_t const * ep_desc)
 {
-  (void) rhport; 
+  (void) rhport;
 
   // TODO iso support
   TU_ASSERT(ep_desc->bmAttributes.xfer != TUSB_XFER_ISOCHRONOUS);

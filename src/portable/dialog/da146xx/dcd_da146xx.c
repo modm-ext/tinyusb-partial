@@ -615,7 +615,7 @@ bool dcd_edpt_open(uint8_t rhport, tusb_desc_endpoint_t const * desc_edpt)
   uint8_t const dir   = tu_edpt_dir(desc_edpt->bEndpointAddress);
   xfer_ctl_t * xfer = XFER_CTL_BASE(epnum, dir);
   uint8_t iso_mask = 0;
-  
+
   (void)rhport;
 
   TU_ASSERT(desc_edpt->wMaxPacketSize.size <= 1023);

@@ -1,4 +1,4 @@
-/* 
+/*
  * The MIT License (MIT)
  *
  * Copyright (c) 2019 Ha Thach (tinyusb.org)
@@ -44,7 +44,7 @@
 #endif
 
 // Compile-time Assert
-#if __STDC_VERSION__ >= 201112L
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
   #define TU_VERIFY_STATIC   _Static_assert
 #else
   #define TU_VERIFY_STATIC(const_expr, _mess) enum { TU_XSTRCAT(_verify_static_, _TU_COUNTER_) = 1/(!!(const_expr)) }
@@ -118,7 +118,7 @@
 
   #define TU_BSWAP16(u16) (__iar_builtin_REV16(u16))
   #define TU_BSWAP32(u32) (__iar_builtin_REV(u32))
-#else 
+#else
   #error "Compiler attribute porting is required"
 #endif
 

@@ -1,4 +1,4 @@
-/* 
+/*
  * The MIT License (MIT)
  *
  * Copyright (c) 2019 Ha Thach (tinyusb.org)
@@ -466,7 +466,7 @@ void dcd_int_handler(uint8_t rhport)
     // DMA complete move data from SRAM -> Endpoint
     edpt_dma_end();
   }
- 
+
   // Setup tokens are specific to the Control endpoint.
   if ( int_status & USBD_INTEN_EP0SETUP_Msk )
   {

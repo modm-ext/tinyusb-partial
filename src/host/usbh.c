@@ -1,4 +1,4 @@
-/* 
+/*
  * The MIT License (MIT)
  *
  * Copyright (c) 2019 Ha Thach (tinyusb.org)
@@ -223,7 +223,7 @@ tusb_error_t usbh_pipe_control_open(uint8_t dev_addr, uint8_t max_packet_size)
 {
   osal_semaphore_reset( _usbh_devices[dev_addr].control.sem_hdl );
   //osal_mutex_reset( usbh_devices[dev_addr].control.mutex_hdl );
-      
+
   tusb_desc_endpoint_t ep0_desc =
   {
     .bLength          = sizeof(tusb_desc_endpoint_t),
@@ -615,7 +615,7 @@ bool enum_task(hcd_event_t* event)
       {
         if ( usbh_class_drivers[drv_id].class_code == desc_itf->bInterfaceClass ) break;
       }
-      
+
       if( drv_id >= USBH_CLASS_DRIVER_COUNT )
       {
         // skip unsupported class

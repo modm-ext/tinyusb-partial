@@ -1,4 +1,4 @@
-/* 
+/*
  * The MIT License (MIT)
  *
  * Copyright 2019 Sony Semiconductor Solutions Corporation
@@ -191,7 +191,7 @@ void dcd_set_address(uint8_t rhport, uint8_t dev_addr)
 void dcd_remote_wakeup(uint8_t rhport)
 {
   (void) rhport;
-  
+
   DEV_WAKEUP(usbdev);
 }
 
@@ -322,7 +322,7 @@ void dcd_edpt_stall(uint8_t rhport, uint8_t ep_addr)
 void dcd_edpt_clear_stall(uint8_t rhport, uint8_t ep_addr)
 {
   (void) rhport;
-  
+
   uint8_t epnum = tu_edpt_number(ep_addr);
 
   if (epnum >= CXD56_EPNUM)

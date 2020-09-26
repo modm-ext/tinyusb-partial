@@ -1,4 +1,4 @@
-/* 
+/*
  * The MIT License (MIT)
  *
  * Copyright (c) 2019 Nathan Conrad
@@ -150,6 +150,12 @@
 #  define USE_SOF     0
 #endif
 
+// Some STM32F3 devices allow to remap the USB interrupt vectors from shared
+// USB/CAN IRQs to separate CAN and USB IRQs
+#ifndef STM32F3_IRQ_REMAP
+#  define STM32F3_IRQ_REMAP 0
+#endif
+
 /***************************************************
  * Checks, structs, defines, function definitions, etc.
  */
@@ -188,7 +194,7 @@ static void dcd_handle_bus_reset(void);
 static void dcd_transmit_packet(xfer_ctl_t * xfer, uint16_t ep_ix);
 static void dcd_ep_ctr_handler(void);
 
-// PMA allocation/access 
+// PMA allocation/access
 static uint8_t open_ep_count;
 static uint16_t ep_buf_ptr; ///< Points to first free memory location
 static void dcd_pma_alloc_reset(void);
@@ -228,7 +234,7 @@ void dcd_init (uint8_t rhport)
     asm("NOP");
   }
   USB->CNTR = 0; // Enable USB
-  
+
   USB->BTABLE = DCD_STM32_BTABLE_BASE;
 
   reg16_clear_bits(&USB->ISTR, USB_ISTR_ALL_EVENTS); // Clear pending interrupts
@@ -242,7 +248,7 @@ void dcd_init (uint8_t rhport)
 
   USB->CNTR |= USB_CNTR_RESETM | (USE_SOF ? USB_CNTR_SOFM : 0) | USB_CNTR_ESOFM | USB_CNTR_CTRM | USB_CNTR_SUSPM | USB_CNTR_WKUPM;
   dcd_handle_bus_reset();
-  
+
   // Enable pull-up if supported
   if ( dcd_connect ) dcd_connect(rhport);
 }
@@ -276,9 +282,15 @@ void dcd_int_enable (uint8_t rhport)
 #if CFG_TUSB_MCU == OPT_MCU_STM32F0 || CFG_TUSB_MCU == OPT_MCU_STM32L0
   NVIC_EnableIRQ(USB_IRQn);
 #elif CFG_TUSB_MCU == OPT_MCU_STM32F3
+  #if STM32F3_IRQ_REMAP
+  NVIC_EnableIRQ(USB_HP_IRQn);
+  NVIC_EnableIRQ(USB_LP_IRQn);
+  NVIC_EnableIRQ(USBWakeUp_RMP_IRQn);
+  #else
   NVIC_EnableIRQ(USB_HP_CAN_TX_IRQn);
   NVIC_EnableIRQ(USB_LP_CAN_RX0_IRQn);
   NVIC_EnableIRQ(USBWakeUp_IRQn);
+  #endif
 #elif CFG_TUSB_MCU == OPT_MCU_STM32F1
   NVIC_EnableIRQ(USB_HP_CAN1_TX_IRQn);
   NVIC_EnableIRQ(USB_LP_CAN1_RX0_IRQn);
@@ -296,9 +308,15 @@ void dcd_int_disable(uint8_t rhport)
 #if CFG_TUSB_MCU == OPT_MCU_STM32F0 || CFG_TUSB_MCU == OPT_MCU_STM32L0
   NVIC_DisableIRQ(USB_IRQn);
 #elif CFG_TUSB_MCU == OPT_MCU_STM32F3
+  #if STM32F3_IRQ_REMAP
+  NVIC_DisableIRQ(USB_HP_IRQn);
+  NVIC_DisableIRQ(USB_LP_IRQn);
+  NVIC_DisableIRQ(USBWakeUp_RMP_IRQn);
+  #else
   NVIC_DisableIRQ(USB_HP_CAN_TX_IRQn);
   NVIC_DisableIRQ(USB_LP_CAN_RX0_IRQn);
   NVIC_DisableIRQ(USBWakeUp_IRQn);
+  #endif
 #elif CFG_TUSB_MCU == OPT_MCU_STM32F1
   NVIC_DisableIRQ(USB_HP_CAN1_TX_IRQn);
   NVIC_DisableIRQ(USB_LP_CAN1_RX0_IRQn);
@@ -417,7 +435,7 @@ static void dcd_ep_ctr_rx_handler(uint32_t wIstr)
   {
     return;
   }
-  
+
   if((EPindex == 0U) && ((wEPRegVal & USB_EP_SETUP) != 0U)) /* Setup packet */
   {
     // The setup_received function uses memcpy, so this must first copy the setup data into
@@ -553,7 +571,7 @@ void dcd_int_handler(uint8_t rhport) {
     reg16_clear_bits(&USB->ISTR, USB_ISTR_SOF);
     dcd_event_bus_signal(0, DCD_EVENT_SOF, true);
   }
-#endif 
+#endif
 
   if(int_status & USB_ISTR_ESOF) {
     if(remoteWakeCountdown == 1u)
@@ -605,11 +623,11 @@ static void dcd_pma_alloc_reset(void)
 
 /***
  * Allocate a section of PMA
- * 
+ *
  * If the EP number has already been allocated, and the new allocation
  * is larger than the old allocation, then this will fail with a TU_ASSERT.
  * (This is done to simplify the code. More complicated algorithms could be used)
- * 
+ *
  * During failure, TU_ASSERT is used. If this happens, rework/reallocate memory manually.
  */
 static uint16_t dcd_pma_alloc(uint8_t ep_addr, size_t length)
@@ -625,13 +643,13 @@ static uint16_t dcd_pma_alloc(uint8_t ep_addr, size_t length)
     TU_ASSERT(length <= epXferCtl->pma_alloc_size, 0xFFFF);  // Verify no larger than previous alloc
     return epXferCtl->pma_ptr;
   }
-  
-  uint16_t addr = ep_buf_ptr; 
+
+  uint16_t addr = ep_buf_ptr;
   ep_buf_ptr = (uint16_t)(ep_buf_ptr + length); // increment buffer pointer
-  
+
   // Verify no overflow
   TU_ASSERT(ep_buf_ptr <= PMA_LENGTH, 0xFFFF);
-  
+
   epXferCtl->pma_ptr = addr;
   epXferCtl->pma_alloc_size = length;
   //TU_LOG2("dcd_pma_alloc(%x,%x)=%x\r\n",ep_addr,length,addr);
@@ -680,7 +698,7 @@ bool dcd_edpt_open (uint8_t rhport, tusb_desc_endpoint_t const * p_endpoint_desc
   const uint16_t epMaxPktSize = p_endpoint_desc->wMaxPacketSize.size;
   uint16_t pma_addr;
   uint32_t wType;
-  
+
   // Isochronous not supported (yet), and some other driver assumptions.
   TU_ASSERT(p_endpoint_desc->bmAttributes.xfer != TUSB_XFER_ISOCHRONOUS);
   TU_ASSERT(epnum < MAX_EP_COUNT);
@@ -738,9 +756,9 @@ bool dcd_edpt_open (uint8_t rhport, tusb_desc_endpoint_t const * p_endpoint_desc
 
 /**
  * Close an endpoint.
- * 
+ *
  * This function may be called with interrupts enabled or disabled.
- * 
+ *
  * This also clears transfers in progress, should there be any.
  */
 void dcd_edpt_close (uint8_t rhport, uint8_t ep_addr)
@@ -748,7 +766,7 @@ void dcd_edpt_close (uint8_t rhport, uint8_t ep_addr)
   (void)rhport;
   uint32_t const epnum = tu_edpt_number(ep_addr);
   uint32_t const dir   = tu_edpt_dir(ep_addr);
-  
+
   if(dir == TUSB_DIR_IN)
   {
     pcd_set_ep_tx_status(USB,epnum,USB_EP_TX_DIS);
