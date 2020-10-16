@@ -120,9 +120,8 @@
 #define TU_VERIFY_1ARGS(_cond)                         TU_VERIFY_DEFINE(_cond, , false)
 #define TU_VERIFY_2ARGS(_cond, _ret)                   TU_VERIFY_DEFINE(_cond, , _ret)
 
-#ifndef TU_VERIFY
 #define TU_VERIFY(...)                   GET_3RD_ARG(__VA_ARGS__, TU_VERIFY_2ARGS, TU_VERIFY_1ARGS, UNUSED)(__VA_ARGS__)
-#endif
+
 
 /*------------------------------------------------------------------*/
 /* TU_VERIFY WITH HANDLER
@@ -132,9 +131,7 @@
 #define TU_VERIFY_HDLR_2ARGS(_cond, _handler)           TU_VERIFY_DEFINE(_cond, _handler, false)
 #define TU_VERIFY_HDLR_3ARGS(_cond, _handler, _ret)     TU_VERIFY_DEFINE(_cond, _handler, _ret)
 
-#ifndef TU_VERIFY_HDLR
 #define TU_VERIFY_HDLR(...)              GET_4TH_ARG(__VA_ARGS__, TU_VERIFY_HDLR_3ARGS, TU_VERIFY_HDLR_2ARGS,UNUSED)(__VA_ARGS__)
-#endif
 
 /*------------------------------------------------------------------*/
 /* ASSERT
@@ -168,11 +165,11 @@
 /* ASSERT Error
  * basically TU_VERIFY Error with TU_BREAKPOINT() as handler
  *------------------------------------------------------------------*/
-#define ASERT_ERR_1ARGS(_error)         TU_VERIFY_ERR_DEF2(_error, TU_BREAKPOINT())
-#define ASERT_ERR_2ARGS(_error, _ret)   TU_VERIFY_ERR_DEF3(_error, TU_BREAKPOINT(), _ret)
+#define ASSERT_ERR_1ARGS(_error)         TU_VERIFY_ERR_DEF2(_error, TU_BREAKPOINT())
+#define ASSERT_ERR_2ARGS(_error, _ret)   TU_VERIFY_ERR_DEF3(_error, TU_BREAKPOINT(), _ret)
 
 #ifndef TU_ASSERT_ERR
-#define TU_ASSERT_ERR(...)         GET_3RD_ARG(__VA_ARGS__, ASERT_ERR_2ARGS, ASERT_ERR_1ARGS,UNUSED)(__VA_ARGS__)
+#define TU_ASSERT_ERR(...)         GET_3RD_ARG(__VA_ARGS__, ASSERT_ERR_2ARGS, ASSERT_ERR_1ARGS,UNUSED)(__VA_ARGS__)
 #endif
 
 /*------------------------------------------------------------------*/

@@ -116,6 +116,8 @@
   #include "tusb_config.h"
 #endif
 
+
+
 /** \addtogroup group_configuration
  *  @{ */
 
@@ -205,6 +207,10 @@
 
 #ifndef CFG_TUD_HID
   #define CFG_TUD_HID             0
+#endif
+
+#ifndef CFG_TUD_AUDIO
+  #define CFG_TUD_AUDIO           0
 #endif
 
 #ifndef CFG_TUD_MIDI
