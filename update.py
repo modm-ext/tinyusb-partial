@@ -34,5 +34,5 @@ for pattern in source_paths:
 print("Normalizing TinyUSB newlines and whitespace...")
 subprocess.run("sh ./post_script.sh > /dev/null 2>&1", shell=True)
 
-print("Apply patch...")
-subprocess.run("git apply -v --ignore-whitespace modm.patch", shell=True)
+# print("Apply patch...")
+# subprocess.run("git apply -v --ignore-whitespace modm.patch", shell=True)
