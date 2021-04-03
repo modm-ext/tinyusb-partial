@@ -41,8 +41,6 @@ extern "C" {
 //--------------------------------------------------------------------+
 
 // Init device stack
-// Note: when using with RTOS, this should be called after scheduler/kernel is started.
-// Otherwise it could cause kernel issue since USB IRQ handler does use RTOS queue API.
 bool tud_init (void);
 
 // Task function should be called in main/rtos loop
@@ -57,6 +55,10 @@ extern void dcd_int_handler(uint8_t rhport);
 
 // Get current bus speed
 tusb_speed_t tud_speed_get(void);
+
+// Check if device is connected (may not mounted/configured yet)
+// True if just got out of Bus Reset and received the very first data from host
+bool tud_connected(void);
 
 // Check if device is connected and configured
 bool tud_mounted(void);
@@ -127,11 +129,7 @@ TU_ATTR_WEAK void tud_suspend_cb(bool remote_wakeup_en);
 TU_ATTR_WEAK void tud_resume_cb(void);
 
 // Invoked when received control request with VENDOR TYPE
-TU_ATTR_WEAK bool tud_vendor_control_request_cb(uint8_t rhport, tusb_control_request_t const * request);
-
-// Invoked when vendor control request is complete
-TU_ATTR_WEAK bool tud_vendor_control_complete_cb(uint8_t rhport, tusb_control_request_t const * request);
-
+TU_ATTR_WEAK bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_request_t const * request);
 
 //--------------------------------------------------------------------+
 // Binary Device Object Store (BOS) Descriptor Templates
@@ -256,6 +254,7 @@ TU_ATTR_WEAK bool tud_vendor_control_complete_cb(uint8_t rhport, tusb_control_re
   7, TUSB_DESC_ENDPOINT, _epin, TUSB_XFER_INTERRUPT, U16_TO_U8S_LE(_epsize), _ep_interval
 
 //------------- MIDI -------------//
+// MIDI v1.0 is based on Audio v1.0
 
 #define TUD_MIDI_DESC_HEAD_LEN (9 + 9 + 9 + 7)
 #define TUD_MIDI_DESC_HEAD(_itfnum,  _stridx, _numcables) \
@@ -291,10 +290,10 @@ TU_ATTR_WEAK bool tud_vendor_control_complete_cb(uint8_t rhport, tusb_control_re
   /* MS Out Jack (External), connected to In Jack Embedded */\
   9, TUSB_DESC_CS_INTERFACE, MIDI_CS_INTERFACE_OUT_JACK, MIDI_JACK_EXTERNAL, TUD_MIDI_JACKID_OUT_EXT(_cablenum), 1, TUD_MIDI_JACKID_IN_EMB(_cablenum), 1, 0
 
-#define TUD_MIDI_DESC_EP_LEN(_numcables) (7 + 4 + (_numcables))
+#define TUD_MIDI_DESC_EP_LEN(_numcables) (9 + 4 + (_numcables))
 #define TUD_MIDI_DESC_EP(_epout, _epsize, _numcables) \
-  /* Endpoint */\
-  7, TUSB_DESC_ENDPOINT, _epout, TUSB_XFER_BULK, U16_TO_U8S_LE(_epsize), 0,\
+  /* Endpoint: Note Audio v1.0's endpoint has 9 bytes instead of 7 */\
+  9, TUSB_DESC_ENDPOINT, _epout, TUSB_XFER_BULK, U16_TO_U8S_LE(_epsize), 0, 0, 0, \
   /* MS Endpoint (connected to embedded jack) */\
   (uint8_t)(4 + (_numcables)), TUSB_DESC_CS_ENDPOINT, MIDI_CS_ENDPOINT_GENERAL, _numcables
 
@@ -554,9 +553,9 @@ TU_ATTR_WEAK bool tud_vendor_control_complete_cb(uint8_t rhport, tusb_control_re
 // Interface number, description string index, MAC address string index, EP notification address and size, EP data address (out, in), and size, max segment size.
 #define TUD_CDC_ECM_DESCRIPTOR(_itfnum, _desc_stridx, _mac_stridx, _ep_notif, _ep_notif_size, _epout, _epin, _epsize, _maxsegmentsize) \
   /* Interface Association */\
-  8, TUSB_DESC_INTERFACE_ASSOCIATION, _itfnum, 2, TUSB_CLASS_CDC, CDC_COMM_SUBCLASS_ETHERNET_NETWORKING_CONTROL_MODEL, 0, 0,\
+  8, TUSB_DESC_INTERFACE_ASSOCIATION, _itfnum, 2, TUSB_CLASS_CDC, CDC_COMM_SUBCLASS_ETHERNET_CONTROL_MODEL, 0, 0,\
   /* CDC Control Interface */\
-  9, TUSB_DESC_INTERFACE, _itfnum, 0, 1, TUSB_CLASS_CDC, CDC_COMM_SUBCLASS_ETHERNET_NETWORKING_CONTROL_MODEL, 0, _desc_stridx,\
+  9, TUSB_DESC_INTERFACE, _itfnum, 0, 1, TUSB_CLASS_CDC, CDC_COMM_SUBCLASS_ETHERNET_CONTROL_MODEL, 0, _desc_stridx,\
   /* CDC-ECM Header */\
   5, TUSB_DESC_CS_INTERFACE, CDC_FUNC_DESC_HEADER, U16_TO_U8S_LE(0x0120),\
   /* CDC-ECM Union */\
