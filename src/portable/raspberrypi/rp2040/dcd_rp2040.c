@@ -35,7 +35,6 @@
 #include "pico/fix/rp2040_usb_device_enumeration.h"
 #endif
 
-
 #include "device/dcd.h"
 
 /*------------------------------------------------------------------*/

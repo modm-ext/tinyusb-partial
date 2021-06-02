@@ -29,9 +29,9 @@
 #if TUSB_OPT_DEVICE_ENABLED
 
 #include "tusb.h"
-#include "usbd.h"
+#include "device/usbd.h"
 #include "device/usbd_pvt.h"
-#include "dcd.h"
+#include "device/dcd.h"
 
 #ifndef CFG_TUD_TASK_QUEUE_SZ
 #define CFG_TUD_TASK_QUEUE_SZ   16
@@ -44,6 +44,10 @@
 //--------------------------------------------------------------------+
 // Device Data
 //--------------------------------------------------------------------+
+
+// Invalid driver ID in itf2drv[] ep2drv[][] mapping
+enum { DRVID_INVALID = 0xFFu };
+
 typedef struct
 {
   struct TU_ATTR_PACKED
@@ -75,9 +79,6 @@ typedef struct
 }usbd_device_t;
 
 static usbd_device_t _usbd_dev;
-
-// Invalid driver ID in itf2drv[] ep2drv[][] mapping
-enum { DRVID_INVALID = 0xFFu };
 
 //--------------------------------------------------------------------+
 // Class Driver
@@ -182,7 +183,19 @@ static usbd_class_driver_t const _usbd_driver[] =
     .reset            = dfu_rtd_reset,
     .open             = dfu_rtd_open,
     .control_xfer_cb  = dfu_rtd_control_xfer_cb,
-    .xfer_cb          = dfu_rtd_xfer_cb,
+    .xfer_cb          = NULL,
+    .sof              = NULL
+  },
+  #endif
+
+  #if CFG_TUD_DFU_MODE
+  {
+    DRIVER_NAME("DFU-MODE")
+    .init             = dfu_moded_init,
+    .reset            = dfu_moded_reset,
+    .open             = dfu_moded_open,
+    .control_xfer_cb  = dfu_moded_control_xfer_cb,
+    .xfer_cb          = NULL,
     .sof              = NULL
   },
   #endif
@@ -240,6 +253,8 @@ static inline usbd_class_driver_t const * get_driver(uint8_t drvid)
 //--------------------------------------------------------------------+
 // DCD Event
 //--------------------------------------------------------------------+
+
+static bool _usbd_initialized = false;
 
 // Event queue
 // OPT_MODE_DEVICE is used by OS NONE for mutex (disable usb isr)
@@ -301,6 +316,8 @@ static char const* const _tusb_std_request_str[] =
   "Set Interface"     ,
   "Synch Frame"
 };
+
+static char const* const _tusb_speed_str[] = { "Full", "Low", "High" };
 
 // for usbd_control to print the name of control complete driver
 void usbd_driver_print_control_complete_name(usbd_control_xfer_cb_t callback)
@@ -366,8 +383,16 @@ bool tud_connect(void)
 //--------------------------------------------------------------------+
 // USBD Task
 //--------------------------------------------------------------------+
-bool tud_init (void)
+bool tud_inited(void)
 {
+  return _usbd_initialized;
+}
+
+bool tud_init (uint8_t rhport)
+{
+  // skip if already initialized
+  if (_usbd_initialized) return _usbd_initialized;
+
   TU_LOG2("USBD init\r\n");
 
   tu_varclr(&_usbd_dev);
@@ -397,8 +422,10 @@ bool tud_init (void)
   }
 
   // Init device controller driver
-  dcd_init(TUD_OPT_RHPORT);
-  dcd_int_enable(TUD_OPT_RHPORT);
+  dcd_init(rhport);
+  dcd_int_enable(rhport);
+
+  _usbd_initialized = true;
 
   return true;
 }
@@ -464,7 +491,7 @@ void tud_task (void)
     switch ( event.event_id )
     {
       case DCD_EVENT_BUS_RESET:
-        TU_LOG2("\r\n");
+        TU_LOG2(": %s Speed\r\n", _tusb_speed_str[event.bus_reset.speed]);
         usbd_reset(event.rhport);
         _usbd_dev.speed = event.bus_reset.speed;
       break;
@@ -1075,7 +1102,7 @@ void dcd_event_xfer_complete (uint8_t rhport, uint8_t ep_addr, uint32_t xferred_
 }
 
 //--------------------------------------------------------------------+
-// Helper
+// USBD API For Class Driver
 //--------------------------------------------------------------------+
 
 // Parse consecutive endpoint descriptors (IN & OUT)
@@ -1169,7 +1196,6 @@ bool usbd_edpt_claim(uint8_t rhport, uint8_t ep_addr)
 #if CFG_TUSB_OS != OPT_OS_NONE
   // pre-check to help reducing mutex lock
   TU_VERIFY((_usbd_dev.ep_status[epnum][dir].busy == 0) && (_usbd_dev.ep_status[epnum][dir].claimed == 0));
-
   osal_mutex_lock(_usbd_mutex, OSAL_TIMEOUT_WAIT_FOREVER);
 #endif
 
@@ -1227,6 +1253,39 @@ bool usbd_edpt_xfer(uint8_t rhport, uint8_t ep_addr, uint8_t * buffer, uint16_t 
   _usbd_dev.ep_status[epnum][dir].busy = true;
 
   if ( dcd_edpt_xfer(rhport, ep_addr, buffer, total_bytes) )
+  {
+    TU_LOG2("OK\r\n");
+    return true;
+  }else
+  {
+    // DCD error, mark endpoint as ready to allow next transfer
+    _usbd_dev.ep_status[epnum][dir].busy = false;
+    _usbd_dev.ep_status[epnum][dir].claimed = 0;
+    TU_LOG2("failed\r\n");
+    TU_BREAKPOINT();
+    return false;
+  }
+}
+
+// The number of bytes has to be given explicitly to allow more flexible control of how many
+// bytes should be written and second to keep the return value free to give back a boolean
+// success message. If total_bytes is too big, the FIFO will copy only what is available
+// into the USB buffer!
+bool usbd_edpt_xfer_fifo(uint8_t rhport, uint8_t ep_addr, tu_fifo_t * ff, uint16_t total_bytes)
+{
+  uint8_t const epnum = tu_edpt_number(ep_addr);
+  uint8_t const dir   = tu_edpt_dir(ep_addr);
+
+  TU_LOG2("  Queue ISO EP %02X with %u bytes ... ", ep_addr, total_bytes);
+
+  // Attempt to transfer on a busy endpoint, sound like an race condition !
+  TU_ASSERT(_usbd_dev.ep_status[epnum][dir].busy == 0);
+
+  // Set busy first since the actual transfer can be complete before dcd_edpt_xfer() could return
+  // and usbd task can preempt and clear the busy
+  _usbd_dev.ep_status[epnum][dir].busy = true;
+
+  if (dcd_edpt_xfer_fifo(rhport, ep_addr, ff, total_bytes))
   {
     TU_LOG2("OK\r\n");
     return true;

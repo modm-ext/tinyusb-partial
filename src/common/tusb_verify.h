@@ -36,7 +36,6 @@
  * as C++ for the sake of code simplicity. Beware of a headache macro
  * manipulation that you are told to stay away.
  *
- *
  * This contains macros for both VERIFY and ASSERT:
  *
  *   VERIFY: Used when there is an error condition which is not the
@@ -51,8 +50,7 @@
  *           function calls to confirm a function's (untainted)
  *           parameters are valid.
  *
- *
- * The difference in behaviour is that ASSERT triggers a breakpoint while
+ * The difference in behavior is that ASSERT triggers a breakpoint while
  * verify does not.
  *
  *   #define TU_VERIFY(cond)                  if(cond) return false;
