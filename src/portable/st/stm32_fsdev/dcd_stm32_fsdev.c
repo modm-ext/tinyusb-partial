@@ -42,6 +42,7 @@
  * L0x2, L0x3                     1024 byte buffer
  * L1                              512 byte buffer
  * L4x2, L4x3                     1024 byte buffer
+ * G4                             1024 byte buffer
  *
  * To use this driver, you must:
  * - If you are using a device with crystal-less USB, set up the clock recovery system (CRS)
@@ -113,7 +114,8 @@
       (CFG_TUSB_MCU == OPT_MCU_STM32F0                          ) || \
       (CFG_TUSB_MCU == OPT_MCU_STM32F1 && defined(STM32F1_FSDEV)) || \
       (CFG_TUSB_MCU == OPT_MCU_STM32F3                          ) || \
-      (CFG_TUSB_MCU == OPT_MCU_STM32L0                          ) \
+      (CFG_TUSB_MCU == OPT_MCU_STM32L0                          ) || \
+      (CFG_TUSB_MCU == OPT_MCU_STM32G4                          ) \
     )
 
 // In order to reduce the dependance on HAL, we undefine this.
@@ -302,6 +304,10 @@ void dcd_int_enable (uint8_t rhport)
   NVIC_EnableIRQ(USB_HP_CAN1_TX_IRQn);
   NVIC_EnableIRQ(USB_LP_CAN1_RX0_IRQn);
   NVIC_EnableIRQ(USBWakeUp_IRQn);
+#elif CFG_TUSB_MCU == OPT_MCU_STM32G4
+  NVIC_EnableIRQ(USB_HP_IRQn);
+  NVIC_EnableIRQ(USB_LP_IRQn);
+  NVIC_EnableIRQ(USBWakeUp_IRQn);
 #else
   #error Unknown arch in USB driver
 #endif
@@ -335,6 +341,10 @@ void dcd_int_disable(uint8_t rhport)
 #elif CFG_TUSB_MCU == OPT_MCU_STM32F1
   NVIC_DisableIRQ(USB_HP_CAN1_TX_IRQn);
   NVIC_DisableIRQ(USB_LP_CAN1_RX0_IRQn);
+  NVIC_DisableIRQ(USBWakeUp_IRQn);
+#elif CFG_TUSB_MCU == OPT_MCU_STM32G4
+  NVIC_DisableIRQ(USB_HP_IRQn);
+  NVIC_DisableIRQ(USB_LP_IRQn);
   NVIC_DisableIRQ(USBWakeUp_IRQn);
 #else
   #error Unknown arch in USB driver
