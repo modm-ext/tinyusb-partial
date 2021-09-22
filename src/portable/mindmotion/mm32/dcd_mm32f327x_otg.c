@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2020 Koji Kitayama
+ * Copyright (c) 2020 SE TEAM
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,13 +26,11 @@
 
 #include "tusb_option.h"
 
-#if TUSB_OPT_DEVICE_ENABLED && ( \
-      ( CFG_TUSB_MCU == OPT_MCU_MKL25ZXX ) || ( CFG_TUSB_MCU == OPT_MCU_K32L2BXX ) \
-    )
+#if TUSB_OPT_DEVICE_ENABLED && ( CFG_TUSB_MCU == OPT_MCU_MM32F327X )
 
-#include "fsl_device_registers.h"
-#define KHCI        USB0
-
+#include "reg_usb_otg_fs.h"
+#include "mm32_device.h"
+#include "hal_conf.h"
 #include "device/dcd.h"
 
 //--------------------------------------------------------------------+
@@ -134,17 +132,17 @@ static void prepare_next_setup_packet(uint8_t rhport)
 
 static void process_stall(uint8_t rhport)
 {
-  if (KHCI->ENDPOINT[0].ENDPT & USB_ENDPT_EPSTALL_MASK) {
+  if (USB_OTG_FS->EP_CTL[0] & USB_ENDPT_EPSTALL_MASK) {
     /* clear stall condition of the control pipe */
     prepare_next_setup_packet(rhport);
-    KHCI->ENDPOINT[0].ENDPT &= ~USB_ENDPT_EPSTALL_MASK;
+    USB_OTG_FS->EP_CTL[0] &= ~USB_ENDPT_EPSTALL_MASK;
   }
 }
 
 static void process_tokdne(uint8_t rhport)
 {
-  const unsigned s = KHCI->STAT;
-  KHCI->ISTAT = USB_ISTAT_TOKDNE_MASK; /* fetch the next token if received */
+  const unsigned s = USB_OTG_FS->STAT;
+  USB_OTG_FS->INT_STAT = USB_ISTAT_TOKDNE_MASK; /* fetch the next token if received */
   buffer_descriptor_t *bd = (buffer_descriptor_t *)&_dcd.bda[s];
   endpoint_state_t    *ep = &_dcd.endpoint_unified[s >> 3];
   unsigned odd = (s & USB_STAT_ODD_MASK) ? 1 : 0;
@@ -160,7 +158,7 @@ static void process_tokdne(uint8_t rhport)
   ep->odd       = odd ^ 1;
   if (pid == TOK_PID_SETUP) {
     dcd_event_setup_received(rhport, bd->addr, true);
-    KHCI->CTL &= ~USB_CTL_TXSUSPENDTOKENBUSY_MASK;
+    USB_OTG_FS->CTL &= ~USB_CTL_TXSUSPENDTOKENBUSY_MASK;
     return;
   }
   if (s >> 4) {
@@ -192,7 +190,7 @@ static void process_tokdne(uint8_t rhport)
     if (_dcd.addr) {
       /* When the transfer was the SetAddress,
        * the device address should be updated here. */
-      KHCI->ADDR = _dcd.addr;
+      USB_OTG_FS->ADDR = _dcd.addr;
       _dcd.addr  = 0;
     }
     prepare_next_setup_packet(rhport);
@@ -201,14 +199,13 @@ static void process_tokdne(uint8_t rhport)
 
 static void process_bus_reset(uint8_t rhport)
 {
-  KHCI->USBCTRL &= ~USB_USBCTRL_SUSP_MASK;
-  KHCI->CTL     |= USB_CTL_ODDRST_MASK;
-  KHCI->ADDR     = 0;
-  KHCI->INTEN    = (KHCI->INTEN & ~USB_INTEN_RESUMEEN_MASK) | USB_INTEN_SLEEPEN_MASK;
+  USB_OTG_FS->CTL     |= USB_CTL_ODDRST_MASK;
+  USB_OTG_FS->ADDR     = 0;
+  USB_OTG_FS->INT_ENB    = (USB_OTG_FS->INT_ENB & ~USB_INTEN_RESUMEEN_MASK) | USB_INTEN_SLEEPEN_MASK;
 
-  KHCI->ENDPOINT[0].ENDPT = USB_ENDPT_EPHSHK_MASK | USB_ENDPT_EPRXEN_MASK | USB_ENDPT_EPTXEN_MASK;
+  USB_OTG_FS->EP_CTL[0] = USB_ENDPT_EPHSHK_MASK | USB_ENDPT_EPRXEN_MASK | USB_ENDPT_EPTXEN_MASK;
   for (unsigned i = 1; i < 16; ++i) {
-    KHCI->ENDPOINT[i].ENDPT = 0;
+    USB_OTG_FS->EP_CTL[i] = 0;
   }
   buffer_descriptor_t *bd = _dcd.bdt[0][0];
   for (unsigned i = 0; i < sizeof(_dcd.bdt)/sizeof(*bd); ++i, ++bd) {
@@ -225,25 +222,23 @@ static void process_bus_reset(uint8_t rhport)
   tu_memclr(_dcd.endpoint[1], sizeof(_dcd.endpoint) - sizeof(_dcd.endpoint[0]));
   _dcd.addr = 0;
   prepare_next_setup_packet(rhport);
-  KHCI->CTL &= ~USB_CTL_ODDRST_MASK;
+  USB_OTG_FS->CTL &= ~USB_CTL_ODDRST_MASK;
   dcd_event_bus_reset(rhport, TUSB_SPEED_FULL, true);
 }
 
 static void process_bus_inactive(uint8_t rhport)
 {
   (void) rhport;
-  const unsigned inten = KHCI->INTEN;
-  KHCI->INTEN    = (inten & ~USB_INTEN_SLEEPEN_MASK) | USB_INTEN_RESUMEEN_MASK;
-  KHCI->USBCTRL |= USB_USBCTRL_SUSP_MASK;
+  const unsigned inten = USB_OTG_FS->INT_ENB;
+  USB_OTG_FS->INT_ENB    = (inten & ~USB_INTEN_SLEEPEN_MASK) | USB_INTEN_RESUMEEN_MASK;
   dcd_event_bus_signal(rhport, DCD_EVENT_SUSPEND, true);
 }
 
 static void process_bus_active(uint8_t rhport)
 {
   (void) rhport;
-  KHCI->USBCTRL &= ~USB_USBCTRL_SUSP_MASK;
-  const unsigned inten = KHCI->INTEN;
-  KHCI->INTEN    = (inten & ~USB_INTEN_RESUMEEN_MASK) | USB_INTEN_SLEEPEN_MASK;
+  const unsigned inten = USB_OTG_FS->INT_ENB;
+  USB_OTG_FS->INT_ENB    = (inten & ~USB_INTEN_RESUMEEN_MASK) | USB_INTEN_SLEEPEN_MASK;
   dcd_event_bus_signal(rhport, DCD_EVENT_RESUME, true);
 }
 
@@ -254,31 +249,31 @@ void dcd_init(uint8_t rhport)
 {
   (void) rhport;
 
-  KHCI->USBTRC0 |= USB_USBTRC0_USBRESET_MASK;
-  while (KHCI->USBTRC0 & USB_USBTRC0_USBRESET_MASK);
   tu_memclr(&_dcd, sizeof(_dcd));
-  KHCI->USBTRC0 |= TU_BIT(6); /* software must set this bit to 1 */
-  KHCI->BDTPAGE1 = (uint8_t)((uintptr_t)_dcd.bdt >>  8);
-  KHCI->BDTPAGE2 = (uint8_t)((uintptr_t)_dcd.bdt >> 16);
-  KHCI->BDTPAGE3 = (uint8_t)((uintptr_t)_dcd.bdt >> 24);
+  USB_OTG_FS->BDT_PAGE_01 = (uint8_t)((uintptr_t)_dcd.bdt >>  8);
+  USB_OTG_FS->BDT_PAGE_02 = (uint8_t)((uintptr_t)_dcd.bdt >> 16);
+  USB_OTG_FS->BDT_PAGE_03 = (uint8_t)((uintptr_t)_dcd.bdt >> 24);
 
   dcd_connect(rhport);
-  NVIC_ClearPendingIRQ(USB0_IRQn);
+  NVIC_ClearPendingIRQ(USB_FS_IRQn);
 }
-
+#define USB_DEVICE_INTERRUPT_PRIORITY (3U)
 void dcd_int_enable(uint8_t rhport)
 {
+  uint8_t irqNumber;
+  irqNumber = USB_FS_IRQn;
   (void) rhport;
-  KHCI->INTEN = USB_INTEN_USBRSTEN_MASK | USB_INTEN_TOKDNEEN_MASK |
+  USB_OTG_FS->INT_ENB = USB_INTEN_USBRSTEN_MASK | USB_INTEN_TOKDNEEN_MASK |
     USB_INTEN_SLEEPEN_MASK | USB_INTEN_ERROREN_MASK | USB_INTEN_STALLEN_MASK;
-  NVIC_EnableIRQ(USB0_IRQn);
+  NVIC_SetPriority((IRQn_Type)irqNumber, USB_DEVICE_INTERRUPT_PRIORITY);
+  NVIC_EnableIRQ(USB_FS_IRQn);
 }
 
 void dcd_int_disable(uint8_t rhport)
 {
   (void) rhport;
-  NVIC_DisableIRQ(USB0_IRQn);
-  KHCI->INTEN = 0;
+  NVIC_DisableIRQ(USB_FS_IRQn);
+  USB_OTG_FS->INT_ENB = 0;
 }
 
 void dcd_set_address(uint8_t rhport, uint8_t dev_addr)
@@ -288,29 +283,26 @@ void dcd_set_address(uint8_t rhport, uint8_t dev_addr)
   /* Response with status first before changing device address */
   dcd_edpt_xfer(rhport, tu_edpt_addr(0, TUSB_DIR_IN), NULL, 0);
 }
-
+extern u32 SystemCoreClock ;
 void dcd_remote_wakeup(uint8_t rhport)
 {
   (void) rhport;
   unsigned cnt = SystemCoreClock / 100;
-  KHCI->CTL |= USB_CTL_RESUME_MASK;
+  USB_OTG_FS->CTL |= USB_CTL_RESUME_MASK;
   while (cnt--) __NOP();
-  KHCI->CTL &= ~USB_CTL_RESUME_MASK;
+  USB_OTG_FS->CTL &= ~USB_CTL_RESUME_MASK;
 }
 
 void dcd_connect(uint8_t rhport)
 {
   (void) rhport;
-  KHCI->USBCTRL  = 0;
-  KHCI->CONTROL |= USB_CONTROL_DPPULLUPNONOTG_MASK;
-  KHCI->CTL     |= USB_CTL_USBENSOFEN_MASK;
+  USB_OTG_FS->CTL     |= USB_CTL_USBENSOFEN_MASK;
 }
 
 void dcd_disconnect(uint8_t rhport)
 {
   (void) rhport;
-  KHCI->CTL      = 0;
-  KHCI->CONTROL &= ~USB_CONTROL_DPPULLUPNONOTG_MASK;
+  USB_OTG_FS->CTL      = 0;
 }
 
 //--------------------------------------------------------------------+
@@ -335,7 +327,7 @@ bool dcd_edpt_open(uint8_t rhport, tusb_desc_endpoint_t const * ep_desc)
   unsigned val = USB_ENDPT_EPCTLDIS_MASK;
   val |= (xfer != TUSB_XFER_ISOCHRONOUS) ? USB_ENDPT_EPHSHK_MASK: 0;
   val |= dir ? USB_ENDPT_EPTXEN_MASK : USB_ENDPT_EPRXEN_MASK;
-  KHCI->ENDPOINT[epn].ENDPT |= val;
+  USB_OTG_FS->EP_CTL[epn] |= val;
 
   if (xfer != TUSB_XFER_ISOCHRONOUS) {
     bd[odd].dts      = 1;
@@ -356,7 +348,7 @@ void dcd_edpt_close(uint8_t rhport, uint8_t ep_addr)
   endpoint_state_t *ep    = &_dcd.endpoint[epn][dir];
   buffer_descriptor_t *bd = &_dcd.bdt[epn][dir][0];
   const unsigned msk      = dir ? USB_ENDPT_EPTXEN_MASK : USB_ENDPT_EPRXEN_MASK;
-  KHCI->ENDPOINT[epn].ENDPT &= ~msk;
+  USB_OTG_FS->EP_CTL[epn] &= ~msk;
   ep->max_packet_size = 0;
   ep->length          = 0;
   ep->remaining       = 0;
@@ -366,7 +358,7 @@ void dcd_edpt_close(uint8_t rhport, uint8_t ep_addr)
 bool dcd_edpt_xfer(uint8_t rhport, uint8_t ep_addr, uint8_t* buffer, uint16_t total_bytes)
 {
   (void) rhport;
-  NVIC_DisableIRQ(USB0_IRQn);
+  NVIC_DisableIRQ(USB_FS_IRQn);
   const unsigned epn = ep_addr & 0xFu;
   const unsigned dir = (ep_addr & TUSB_DIR_IN_MASK) ? TUSB_DIR_IN : TUSB_DIR_OUT;
   endpoint_state_t    *ep = &_dcd.endpoint[epn][dir];
@@ -392,7 +384,7 @@ bool dcd_edpt_xfer(uint8_t rhport, uint8_t ep_addr, uint8_t* buffer, uint16_t to
   bd->addr      = buffer;
   __DSB();
   bd->own  = 1; /* the own bit must set after addr */
-  NVIC_EnableIRQ(USB0_IRQn);
+  NVIC_EnableIRQ(USB_FS_IRQn);
   return true;
 }
 
@@ -401,7 +393,7 @@ void dcd_edpt_stall(uint8_t rhport, uint8_t ep_addr)
   (void) rhport;
   const unsigned epn = ep_addr & 0xFu;
   if (0 == epn) {
-    KHCI->ENDPOINT[epn].ENDPT |=  USB_ENDPT_EPSTALL_MASK;
+    USB_OTG_FS->EP_CTL[epn] |=  USB_ENDPT_EPSTALL_MASK;
   } else {
     const unsigned dir      = (ep_addr & TUSB_DIR_IN_MASK) ? TUSB_DIR_IN : TUSB_DIR_OUT;
     buffer_descriptor_t *bd = _dcd.bdt[epn][dir];
@@ -433,40 +425,40 @@ void dcd_int_handler(uint8_t rhport)
 {
   (void) rhport;
 
-  uint32_t is  = KHCI->ISTAT;
-  uint32_t msk = KHCI->INTEN;
-  KHCI->ISTAT = is & ~msk;
+  uint32_t is  = USB_OTG_FS->INT_STAT;
+  uint32_t msk = USB_OTG_FS->INT_ENB;
+  USB_OTG_FS->INT_STAT = is & ~msk;
   is &= msk;
   if (is & USB_ISTAT_ERROR_MASK) {
     /* TODO: */
-    uint32_t es = KHCI->ERRSTAT;
-    KHCI->ERRSTAT = es;
-    KHCI->ISTAT   = is; /* discard any pending events */
+    uint32_t es = USB_OTG_FS->ERR_STAT;
+    USB_OTG_FS->ERR_STAT = es;
+    USB_OTG_FS->INT_STAT   = is; /* discard any pending events */
     return;
   }
 
   if (is & USB_ISTAT_USBRST_MASK) {
-    KHCI->ISTAT = is; /* discard any pending events */
+    USB_OTG_FS->INT_STAT = is; /* discard any pending events */
     process_bus_reset(rhport);
     return;
   }
   if (is & USB_ISTAT_SLEEP_MASK) {
-    KHCI->ISTAT = USB_ISTAT_SLEEP_MASK;
+    USB_OTG_FS->INT_STAT = USB_ISTAT_SLEEP_MASK;
     process_bus_inactive(rhport);
     return;
   }
   if (is & USB_ISTAT_RESUME_MASK) {
-    KHCI->ISTAT = USB_ISTAT_RESUME_MASK;
+    USB_OTG_FS->INT_STAT = USB_ISTAT_RESUME_MASK;
     process_bus_active(rhport);
     return;
   }
   if (is & USB_ISTAT_SOFTOK_MASK) {
-    KHCI->ISTAT = USB_ISTAT_SOFTOK_MASK;
+    USB_OTG_FS->INT_STAT = USB_ISTAT_SOFTOK_MASK;
     dcd_event_bus_signal(rhport, DCD_EVENT_SOF, true);
     return;
   }
   if (is & USB_ISTAT_STALL_MASK) {
-    KHCI->ISTAT = USB_ISTAT_STALL_MASK;
+    USB_OTG_FS->INT_STAT = USB_ISTAT_STALL_MASK;
     process_stall(rhport);
     return;
   }

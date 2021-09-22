@@ -30,10 +30,23 @@
 #include "common/tusb_common.h"
 #include "osal/osal.h"
 #include "common/tusb_fifo.h"
+#include "dcd_attr.h"
 
 #ifdef __cplusplus
  extern "C" {
 #endif
+
+//--------------------------------------------------------------------+
+// Configuration
+//--------------------------------------------------------------------+
+
+#ifndef CFG_TUD_ENDPPOINT_MAX
+  #define CFG_TUD_ENDPPOINT_MAX   DCD_ATTR_ENDPOINT_MAX
+#endif
+
+//--------------------------------------------------------------------+
+// MACRO CONSTANT TYPEDEF PROTYPES
+//--------------------------------------------------------------------+
 
 typedef enum
 {
@@ -122,7 +135,7 @@ void dcd_disconnect(uint8_t rhport) TU_ATTR_WEAK;
 void dcd_edpt0_status_complete(uint8_t rhport, tusb_control_request_t const * request) TU_ATTR_WEAK;
 
 // Configure endpoint's registers according to descriptor
-bool dcd_edpt_open            (uint8_t rhport, tusb_desc_endpoint_t const * p_endpoint_desc);
+bool dcd_edpt_open            (uint8_t rhport, tusb_desc_endpoint_t const * desc_ep);
 
 // Close an endpoint.
 // Since it is weak, caller must TU_ASSERT this function's existence before calling it.
@@ -139,6 +152,7 @@ bool dcd_edpt_xfer_fifo       (uint8_t rhport, uint8_t ep_addr, tu_fifo_t * ff, 
 void dcd_edpt_stall           (uint8_t rhport, uint8_t ep_addr);
 
 // clear stall, data toggle is also reset to DATA0
+// This API never calls with control endpoints, since it is auto cleared when receiving setup packet
 void dcd_edpt_clear_stall     (uint8_t rhport, uint8_t ep_addr);
 
 //--------------------------------------------------------------------+
