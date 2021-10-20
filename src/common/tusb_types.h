@@ -69,6 +69,18 @@ typedef enum
   TUSB_DIR_IN_MASK = 0x80
 }tusb_dir_t;
 
+/// Isochronous End Point Attributes
+typedef enum
+{
+  TUSB_ISO_EP_ATT_NO_SYNC         = 0x00,
+  TUSB_ISO_EP_ATT_ASYNCHRONOUS    = 0x04,
+  TUSB_ISO_EP_ATT_ADAPTIVE        = 0x08,
+  TUSB_ISO_EP_ATT_SYNCHRONOUS     = 0x0C,
+  TUSB_ISO_EP_ATT_DATA            = 0x00, ///< Data End Point
+  TUSB_ISO_EP_ATT_EXPLICIT_FB     = 0x10, ///< Feedback End Point
+  TUSB_ISO_EP_ATT_IMPLICIT_FB     = 0x20, ///< Data endpoint that also serves as an implicit feedback
+}tusb_iso_ep_attribute_t;
+
 /// USB Descriptor Types
 typedef enum
 {
@@ -372,7 +384,7 @@ typedef struct TU_ATTR_PACKED
 
   uint8_t  bNumInterfaces      ; ///< Number of interfaces supported by this speed configuration
   uint8_t  bConfigurationValue ; ///< Value to use to select configuration
-  uint8_t  IConfiguration      ; ///< Index of string descriptor
+  uint8_t  iConfiguration      ; ///< Index of string descriptor
   uint8_t  bmAttributes        ; ///< Same as Configuration descriptor
   uint8_t  bMaxPower           ; ///< Same as Configuration descriptor
 } tusb_desc_other_speed_t;
@@ -387,10 +399,13 @@ typedef struct TU_ATTR_PACKED
   uint8_t  bDeviceClass       ; ///< Class Code
   uint8_t  bDeviceSubClass    ; ///< SubClass Code
   uint8_t  bDeviceProtocol    ; ///< Protocol Code
+
   uint8_t  bMaxPacketSize0    ; ///< Maximum packet size for other speed
   uint8_t  bNumConfigurations ; ///< Number of Other-speed Configurations
   uint8_t  bReserved          ; ///< Reserved for future use, must be zero
 } tusb_desc_device_qualifier_t;
+
+TU_VERIFY_STATIC( sizeof(tusb_desc_device_qualifier_t) == 10, "size is not correct");
 
 /// USB Interface Association Descriptor (IAD ECN)
 typedef struct TU_ATTR_PACKED
