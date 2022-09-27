@@ -38,6 +38,9 @@ for pattern in source_paths:
                            dest.open("w", encoding="utf-8") as wfile:
             wfile.writelines(l.rstrip()+"\n" for l in rfile.readlines())
 
+print("Apply patch...")
+subprocess.run("git apply -v --ignore-whitespace modm.patch", shell=True)
+
 subprocess.run("git add src LICENSE", shell=True)
 if subprocess.call("git diff-index --quiet HEAD --", shell=True):
     subprocess.run('git commit -m "Update TinyUSB to v{}"'.format(tag), shell=True)

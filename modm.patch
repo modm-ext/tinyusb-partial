@@ -1,0 +1,15 @@
+diff --git a/src/tusb.h b/src/tusb.h
+index b776d7d..3fe842f 100644
+--- a/src/tusb.h
++++ b/src/tusb.h
+@@ -38,7 +38,9 @@
+ #include "osal/osal.h"
+ #include "common/tusb_fifo.h"
+ 
+-#include "class/hid/hid.h"
++#if CFG_TUH_HID || CFG_TUD_HID
++  #include "class/hid/hid.h"
++#endif
+ 
+ //------------- HOST -------------//
+ #if CFG_TUH_ENABLED

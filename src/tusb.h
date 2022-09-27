@@ -38,7 +38,9 @@
 #include "osal/osal.h"
 #include "common/tusb_fifo.h"
 
-#include "class/hid/hid.h"
+#if CFG_TUH_HID || CFG_TUD_HID
+  #include "class/hid/hid.h"
+#endif
 
 //------------- HOST -------------//
 #if CFG_TUH_ENABLED
