@@ -11,5 +11,5 @@ index b776d7d..3fe842f 100644
 +  #include "class/hid/hid.h"
 +#endif
  
- //------------- HOST -------------//
- #if CFG_TUH_ENABLED
+ //------------- TypeC -------------//
+ #if CFG_TUC_ENABLED

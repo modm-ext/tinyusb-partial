@@ -39,7 +39,9 @@ for pattern in source_paths:
             wfile.writelines(l.rstrip()+"\n" for l in rfile.readlines())
 
 print("Apply patch...")
-subprocess.run("git apply -v --ignore-whitespace modm.patch", shell=True)
+if subprocess.call("git apply -v --ignore-whitespace modm.patch", shell=True):
+    print("Patch failed to apply!...")
+    exit(1)
 
 subprocess.run("git add src LICENSE", shell=True)
 if subprocess.call("git diff-index --quiet HEAD --", shell=True):
