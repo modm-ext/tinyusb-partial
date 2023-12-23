@@ -44,4 +44,3 @@ void hcd_int_disable(uint8_t rhport)
 }
 
 #endif
-
