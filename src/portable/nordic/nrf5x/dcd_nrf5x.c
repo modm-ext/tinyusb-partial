@@ -39,8 +39,8 @@
 #endif
 
 #include "nrf.h"
-#include "nrf_clock.h"
-#include "nrfx_usbd_errata.h"
+#include "nrfx_clock.h"
+#include "nrf_erratas.h"
 
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
@@ -425,6 +425,21 @@ void dcd_edpt_close(uint8_t rhport, uint8_t ep_addr) {
   __ISB();
   __DSB();
 }
+
+#if 0
+bool dcd_edpt_iso_alloc(uint8_t rhport, uint8_t ep_addr, uint16_t largest_packet_size) {
+  (void)rhport;
+  (void)ep_addr;
+  (void)largest_packet_size;
+  return false;
+}
+
+bool dcd_edpt_iso_activate(uint8_t rhport, const tusb_desc_endpoint_t *desc_ep) {
+  (void)rhport;
+  (void)desc_ep;
+  return false;
+}
+#endif
 
 bool dcd_edpt_xfer(uint8_t rhport, uint8_t ep_addr, uint8_t* buffer, uint16_t total_bytes) {
   (void) rhport;
@@ -926,7 +941,7 @@ void tusb_hal_nrf_power_event(uint32_t event) {
 
 #ifdef NRF52_SERIES // NRF53 does not need this errata
         // ERRATA 171, 187, 166
-        if (nrfx_usbd_errata_187()) {
+        if (nrf52_errata_187()) {
           // CRITICAL_REGION_ENTER();
           if (*((volatile uint32_t*) (0x4006EC00)) == 0x00000000) {
             *((volatile uint32_t*) (0x4006EC00)) = 0x00009375;
@@ -938,7 +953,7 @@ void tusb_hal_nrf_power_event(uint32_t event) {
           // CRITICAL_REGION_EXIT();
         }
 
-        if (nrfx_usbd_errata_171()) {
+        if (nrf52_errata_171()) {
           // CRITICAL_REGION_ENTER();
           if (*((volatile uint32_t*) (0x4006EC00)) == 0x00000000) {
             *((volatile uint32_t*) (0x4006EC00)) = 0x00009375;
@@ -974,7 +989,7 @@ void tusb_hal_nrf_power_event(uint32_t event) {
       __DSB(); // for sync
 
 #ifdef NRF52_SERIES
-      if (nrfx_usbd_errata_171()) {
+      if (nrf52_errata_171()) {
         // CRITICAL_REGION_ENTER();
         if (*((volatile uint32_t*) (0x4006EC00)) == 0x00000000) {
           *((volatile uint32_t*) (0x4006EC00)) = 0x00009375;
@@ -987,7 +1002,7 @@ void tusb_hal_nrf_power_event(uint32_t event) {
         // CRITICAL_REGION_EXIT();
       }
 
-      if (nrfx_usbd_errata_187()) {
+      if (nrf52_errata_187()) {
         // CRITICAL_REGION_ENTER();
         if (*((volatile uint32_t*) (0x4006EC00)) == 0x00000000) {
           *((volatile uint32_t*) (0x4006EC00)) = 0x00009375;
@@ -999,7 +1014,7 @@ void tusb_hal_nrf_power_event(uint32_t event) {
         // CRITICAL_REGION_EXIT();
       }
 
-      if (nrfx_usbd_errata_166()) {
+      if (nrf52_errata_166()) {
         *((volatile uint32_t*) (NRF_USBD_BASE + 0x800)) = 0x7E3;
         *((volatile uint32_t*) (NRF_USBD_BASE + 0x804)) = 0x40;
 
@@ -1062,5 +1077,4 @@ void tusb_hal_nrf_power_event(uint32_t event) {
       break;
   }
 }
-
 #endif

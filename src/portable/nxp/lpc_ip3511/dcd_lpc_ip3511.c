@@ -297,7 +297,7 @@ bool dcd_init(uint8_t rhport, const tusb_rhport_init_t* rh_init) {
 
   dcd_reg->EPLISTSTART  = (uint32_t) _dcd.ep;
   dcd_reg->DATABUFSTART = tu_align((uint32_t) &_dcd, TU_BIT(22)); // 22-bit alignment
-  dcd_reg->INTSTAT     |= dcd_reg->INTSTAT; // clear all pending interrupt
+  dcd_reg->INTSTAT      = dcd_reg->INTSTAT; // clear all pending interrupt
   dcd_reg->INTEN        = INT_DEVICE_STATUS_MASK;
   dcd_reg->DEVCMDSTAT  |= DEVCMDSTAT_DEVICE_ENABLE_MASK | DEVCMDSTAT_DEVICE_CONNECT_MASK |
                            DEVCMDSTAT_RESET_CHANGE_MASK | DEVCMDSTAT_CONNECT_CHANGE_MASK | DEVCMDSTAT_SUSPEND_CHANGE_MASK;
@@ -432,6 +432,21 @@ void dcd_edpt_close(uint8_t rhport, uint8_t ep_addr)
   _dcd.ep[ep_id][0].cmd_sts.disable = _dcd.ep[ep_id][1].cmd_sts.disable = 1;
 }
 
+#if 0
+bool dcd_edpt_iso_alloc(uint8_t rhport, uint8_t ep_addr, uint16_t largest_packet_size) {
+  (void)rhport;
+  (void)ep_addr;
+  (void)largest_packet_size;
+  return false;
+}
+
+bool dcd_edpt_iso_activate(uint8_t rhport, const tusb_desc_endpoint_t *desc_ep) {
+  (void)rhport;
+  (void)desc_ep;
+  return false;
+}
+#endif
+
 static void prepare_ep_xfer(uint8_t rhport, uint8_t ep_id, uint16_t buf_offset, uint16_t total_bytes) {
   uint16_t nbytes;
   ep_cmd_sts_t* ep_cs = get_ep_cs(ep_id);
@@ -563,7 +578,8 @@ void dcd_int_handler(uint8_t rhport)
 
   uint32_t const cmd_stat = dcd_reg->DEVCMDSTAT;
 
-  uint32_t int_status = dcd_reg->INTSTAT & dcd_reg->INTEN;
+  uint32_t int_status = dcd_reg->INTSTAT;
+	int_status &= dcd_reg->INTEN;
   dcd_reg->INTSTAT = int_status; // Acknowledge handled interrupt
 
   if (int_status == 0) return;
@@ -630,5 +646,4 @@ void dcd_int_handler(uint8_t rhport)
   // Endpoint transfer complete interrupt
   process_xfer_isr(rhport, int_status);
 }
-
 #endif
