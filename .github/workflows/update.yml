@@ -20,7 +20,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           wget -qL https://raw.githubusercontent.com/modm-ext/partial/main/partial.py
-          python3 partial.py -v hathach/TinyUSB LICENSE "src/**/*" --patch modm.patch
+          python3 partial.py -v hathach/TinyUSB LICENSE "src/**/*"
       - name: Git push
         run: |
           git push origin main
